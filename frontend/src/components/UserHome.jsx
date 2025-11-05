@@ -7,7 +7,8 @@ import {
   Phone, 
   User, 
   LogOut, 
-  LayoutDashboard 
+  LayoutDashboard,
+  ClipboardList 
 } from 'lucide-react';
 
 // --- STYLES OBJECT (CONSISTENT REDESIGN, USER-THEME) ---
@@ -429,6 +430,15 @@ export default function UserHome() {
           >
             <Phone style={styles.sidebarLinkIcon} />
             <span>Contact</span>
+          </a>
+          <a 
+            href="/user/applied-schemes" 
+            style={getSidebarLinkStyle('AppliedSchemes')}
+            onMouseEnter={() => setHover({ type: 'link', id: 'AppliedSchemes' })}
+            onMouseLeave={() => setHover({ type: null, id: null })}
+          >
+            <ClipboardList style={styles.sidebarLinkIcon} />
+            <span>Applied Schemes</span>
           </a>
         </nav>
         

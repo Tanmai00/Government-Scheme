@@ -4,6 +4,8 @@ import mongoose from 'mongoose';
 import dotenv from 'dotenv';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
+import path from 'path';
+import { fileURLToPath } from 'url';
 
 // --- 1. IMPORT ALL MODELS ---
 // Make sure your model files are in a 'models' folder
@@ -28,6 +30,21 @@ const config = {
 const app = express();
 app.use(cors());
 app.use(express.json());
+
+// Serve frontend build in production (single deployable service)
+// This will look for a built frontend at ../frontend/dist
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const frontendDist = path.join(__dirname, '..', 'frontend', 'dist');
+if (process.env.NODE_ENV === 'production') {
+  app.use(express.static(frontendDist));
+  // All other routes should serve the frontend index.html
+  app.get('*', (req, res, next) => {
+    // If the request starts with /api, skip and let API routes handle it
+    if (req.path.startsWith('/api')) return next();
+    res.sendFile(path.join(frontendDist, 'index.html'));
+  });
+}
 
 // --- 4. AUTH MIDDLEWARE ---
 

@@ -1,0 +1,37 @@
+# Render service manifest for automatic deploys
+# Usage:
+# 1) Push this repository to GitHub (or Git provider).
+# 2) On Render.com, create a new "Web Service" and choose "Deploy from a Git repo".
+# 3) If you connect this repo directly Render will read this manifest and configure the service.
+# 4) Add required environment variables in the Render dashboard (MONGO_URI, JWT_SECRET, ADMIN_SECRET_KEY).
+
+services:
+  - type: web
+    name: govescheme-web
+    env: node
+    plan: free
+    branch: main
+    # Build command builds the frontend and leaves the built files in frontend/dist
+    buildCommand: "cd frontend && npm ci && npm run build"
+    # Start command runs the backend which serves API and static frontend files
+    startCommand: "cd backend && npm ci && npm start"
+    # Optional: set health check path
+    healthCheckPath: "/api/health"
+    envVars:
+      - key: NODE_ENV
+        value: "production"
+      - key: PORT
+        # Render will provide a port, leave value blank to use the default; you can override if needed
+        value: ""
+      - key: MONGO_URI
+        value: ""
+      - key: JWT_SECRET
+        value: ""
+      - key: ADMIN_SECRET_KEY
+        value: ""
+
+# Notes:
+# - Replace 'branch: main' with your default branch name (e.g., master) if it's different.
+# - Keep the envVars values empty in the file and set them securely in Render dashboard.
+# - After connecting the repo and enabling auto-deploys, every push to the chosen branch triggers a rebuild and redeploy.
+# - The service will expose a public URL (e.g., https://your-servicename.onrender.com) automatically.

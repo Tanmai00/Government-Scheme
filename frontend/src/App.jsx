@@ -15,6 +15,7 @@ import Contact from './components/Contact.jsx';
 import Profile from './components/Profile.jsx';
 import AdminDashboard from './components/AdminDashboard.jsx';
 import AdminSchemes from './components/AdminSchemes.jsx';
+import AppliedSchemes from './components/AppliedSchemes.jsx';
 
 function App() {
   return (
@@ -35,6 +36,7 @@ function App() {
             <Route path="/user/eligibility" element={<Eligibility />} />
             <Route path="/user/contact" element={<Contact />} />
             <Route path="/user/profile" element={<Profile />} />
+            <Route path="/user/applied-schemes" element={<AppliedSchemes />} />
           </Route>
 
           {/* Admin Protected Routes */}
