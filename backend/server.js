@@ -28,7 +28,11 @@ const config = {
 
 // --- 3. INITIALIZE EXPRESS APP ---
 const app = express();
-app.use(cors());
+// Configure CORS for production
+app.use(cors({
+  origin: process.env.CORS_ORIGIN || 'http://localhost:5173',
+  credentials: true
+}));
 app.use(express.json());
 
 // Serve frontend build in production (single deployable service)
