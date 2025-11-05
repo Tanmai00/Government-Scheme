@@ -1,5 +1,8 @@
 // src/lib/api.js
-const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:4000';
+// Normalize API base URL and guard against accidental whitespace
+// Default should be the backend root (not including paths)
+const rawApiBase = import.meta.env.VITE_API_BASE_URL || 'http://localhost:4000';
+const API_BASE = (typeof rawApiBase === 'string' ? rawApiBase.trim() : rawApiBase) || 'http://localhost:4000';
 
 export function setToken(newToken) {
   if (newToken) {
@@ -10,12 +13,19 @@ export function setToken(newToken) {
 }
 
 async function request(path, options = {}) {
+  // ensure path is a string and trim accidental whitespace
+  let p = (path || '').toString().trim();
+  // ensure path begins with a single '/'
+  if (!p.startsWith('/')) p = `/${p}`;
   const token = localStorage.getItem('token');
   const headers = { 'Content-Type': 'application/json', ...(options.headers || {}) };
   if (token) {
     headers['Authorization'] = `Bearer ${token}`;
   }
-  const res = await fetch(`${API_BASE}${path}`, { ...options, headers });
+  const finalUrl = `${API_BASE}${p}`;
+  // Helpful debug log in development
+  if (import.meta.env.DEV) console.debug('[api] request ->', finalUrl, options);
+  const res = await fetch(finalUrl, { ...options, headers });
   const text = await res.text();
   let data;
   try {
