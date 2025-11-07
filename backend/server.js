@@ -8,7 +8,6 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 
 // --- 1. IMPORT ALL MODELS ---
-// Make sure your model files are in a 'models' folder
 import { Account } from './models/Account.js';
 import { UserProfile } from './models/UserProfile.js';
 import { AdminProfile } from './models/AdminProfile.js';
@@ -16,7 +15,6 @@ import { Scheme } from './models/Scheme.js';
 import { Application } from './models/Application.js';
 
 // --- 2. CONFIGURATION ---
-// Loads .env variables
 dotenv.config();
 
 const config = {
@@ -28,7 +26,6 @@ const config = {
 
 // --- 3. INITIALIZE EXPRESS APP ---
 const app = express();
-// Configure CORS for production
 app.use(cors({
   origin: process.env.CORS_ORIGIN || 'http://localhost:5173',
   credentials: true
@@ -36,66 +33,57 @@ app.use(cors({
 app.use(express.json());
 
 // Serve frontend build in production (single deployable service)
-// This will look for a built frontend at ../frontend/dist
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const frontendDist = path.join(__dirname, '..', 'frontend', 'dist');
+
 if (process.env.NODE_ENV === 'production') {
   app.use(express.static(frontendDist));
-  // All other routes should serve the frontend index.html
-  app.get('*', (req, res, next) => {
-    // If the request starts with /api, skip and let API routes handle it
+  app.get('/*', (req, res, next) => {
+    if (req.method !== 'GET') return next();
     if (req.path.startsWith('/api')) return next();
     res.sendFile(path.join(frontendDist, 'index.html'));
   });
 }
 
 // --- 4. AUTH MIDDLEWARE ---
-
-// Checks if *any* user is logged in
 async function authRequired(req, res, next) {
   const auth = req.headers.authorization || '';
   const token = auth.startsWith('Bearer ') ? auth.slice(7) : null;
-  
-  if (!token) {
-    return res.status(401).json({ error: 'Missing token' });
-  }
-
+  if (!token) return res.status(401).json({ error: 'Missing token' });
   try {
     const payload = jwt.verify(token, config.jwtSecret);
-    req.user = { id: payload.sub, type: payload.type }; // 'sub' is the user ID
+    req.user = { id: payload.sub, type: payload.type };
     next();
   } catch (e) {
     return res.status(401).json({ error: 'Invalid token' });
   }
 }
 
-// Checks if the user is an 'admin'
 async function adminOnly(req, res, next) {
   if (!req.user || req.user.type !== 'admin') {
-     return res.status(403).json({ error: 'Forbidden: Admin access required' });
+    return res.status(403).json({ error: 'Forbidden: Admin access required' });
   }
   next();
 }
 
-// Checks if the user is a 'user'
 async function userOnly(req, res, next) {
   if (!req.user || req.user.type !== 'user') {
-     return res.status(403).json({ error: 'Forbidden: User access required' });
+    return res.status(403).json({ error: 'Forbidden: User access required' });
   }
   next();
 }
 
 // --- 5. ROUTES ---
-
 // Health Check
 app.get('/api/health', (req, res) => res.json({ ok: true }));
 
-// --- Auth Routes ---
+// Auth helpers
 function signToken(account) {
   return jwt.sign({ sub: account._id.toString(), type: account.type }, config.jwtSecret, { expiresIn: '7d' });
 }
 
+// --- USER AUTH ROUTES ---
 app.post('/api/auth/user/signup', async (req, res) => {
   try {
     const { username, phoneNumber, password } = req.body;
@@ -130,6 +118,7 @@ app.post('/api/auth/user/login', async (req, res) => {
   }
 });
 
+// --- ADMIN AUTH ROUTES ---
 app.post('/api/auth/admin/signup', async (req, res) => {
   try {
     const { username, phoneNumber, password, secretKey } = req.body;
@@ -168,7 +157,7 @@ app.post('/api/auth/admin/login', async (req, res) => {
   }
 });
 
-// --- Scheme Routes ---
+// --- SCHEME ROUTES ---
 app.get('/api/schemes', async (req, res) => {
   try {
     const schemes = await Scheme.find({ is_active: true });
@@ -191,14 +180,12 @@ app.post('/api/schemes', authRequired, adminOnly, async (req, res) => {
   }
 });
 
-// --- Application Routes ---
+// --- APPLICATION ROUTES ---
 app.post('/api/applications', authRequired, userOnly, async (req, res) => {
   try {
     const { schemeId, application_data } = req.body;
     const userProfile = await UserProfile.findOne({ userId: req.user.id });
-    if (!userProfile) {
-      return res.status(404).json({ error: 'User profile not found.' });
-    }
+    if (!userProfile) return res.status(404).json({ error: 'User profile not found.' });
     const newApplication = new Application({
       userId: userProfile._id,
       schemeId,
@@ -214,13 +201,11 @@ app.post('/api/applications', authRequired, userOnly, async (req, res) => {
   }
 });
 
-// --- User "Me" Routes ---
+// --- USER ROUTES ---
 app.get('/api/me/profile', authRequired, userOnly, async (req, res) => {
   try {
     const profile = await UserProfile.findOne({ userId: req.user.id });
-    if (!profile) {
-      return res.status(404).json({ error: 'User profile not found' });
-    }
+    if (!profile) return res.status(404).json({ error: 'User profile not found' });
     res.json(profile);
   } catch (e) {
     res.status(500).json({ error: e.message });
@@ -230,14 +215,11 @@ app.get('/api/me/profile', authRequired, userOnly, async (req, res) => {
 app.get('/api/me/applications', authRequired, userOnly, async (req, res) => {
   try {
     const userProfile = await UserProfile.findOne({ userId: req.user.id });
-    if (!userProfile) {
-      return res.status(404).json({ error: 'User profile not found.' });
-    }
+    if (!userProfile) return res.status(404).json({ error: 'User profile not found.' });
     const applications = await Application.find({ userId: userProfile._id })
       .populate('schemeId', 'name category')
       .sort({ applied_at: -1 });
-    
-    // Rename 'schemeId' to 'schemes' to match your frontend
+
     const results = applications.map(app => {
       const appObj = app.toObject();
       appObj.schemes = appObj.schemeId;
@@ -250,13 +232,11 @@ app.get('/api/me/applications', authRequired, userOnly, async (req, res) => {
   }
 });
 
-// --- Admin Routes ---
+// --- ADMIN ROUTES ---
 app.get('/api/admin/profile', authRequired, adminOnly, async (req, res) => {
   try {
     const profile = await AdminProfile.findOne({ adminId: req.user.id });
-    if (!profile) {
-      return res.status(404).json({ error: 'Admin profile not found' });
-    }
+    if (!profile) return res.status(404).json({ error: 'Admin profile not found' });
     res.json(profile);
   } catch (e) {
     res.status(500).json({ error: e.message });
@@ -269,8 +249,7 @@ app.get('/api/admin/applications', authRequired, adminOnly, async (req, res) => 
       .populate('schemeId', 'name category')
       .populate('userId', 'username phone_number')
       .sort({ applied_at: -1 });
-    
-    // Rename fields to match your frontend
+
     const results = applications.map(app => {
       const appObj = app.toObject();
       appObj.schemes = appObj.schemeId;
@@ -304,9 +283,7 @@ app.post('/api/admin/applications/:appId/reject', authRequired, adminOnly, async
   try {
     const { appId } = req.params;
     const { admin_notes } = req.body;
-    if (!admin_notes) {
-      return res.status(400).json({ error: 'Rejection notes are required' });
-    }
+    if (!admin_notes) return res.status(400).json({ error: 'Rejection notes are required' });
     const application = await Application.findByIdAndUpdate(
       appId,
       { status: 'rejected', reviewed_at: new Date(), admin_notes },
@@ -325,7 +302,7 @@ async function start() {
     console.log('✅ MongoDB connected successfully.');
     app.listen(config.port, () => console.log(`🚀 API running on http://localhost:${config.port}`));
   } catch (e) {
-    console.error('Failed to start server', e);
+    console.error('❌ Failed to start server', e);
     process.exit(1);
   }
 }
